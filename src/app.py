@@ -1,31 +1,33 @@
 # Importing the necessary modules from the Streamlit and LangChain packages
-import streamlit as st
-from langchain.llms import openllm
+import streamlit as st 
+from langchain_ollama import ChatOllama
+from langchain_core.messages import AIMessage, HumanMessage
 
+st.set_page_config(page_title="LLM Chat Application")
+st.header("Chat :blue[Application]")
 
-# Setting the title of the Streamlit application
-st.title('Simple LLM-App 🤖')
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = [AIMessage("Hello, how can I help you?")]
 
-# Creating a sidebar input widget for the OpenAI API key, input type is password for security
-#openai_api_key = st.sidebar.text_input('OpenAI API Key', type='password') #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
+chat_history = st.session_state["chat_history"]
+for history in chat_history:
+    if isinstance(history, AIMessage):
+        st.chat_message("ai").write(history.content)
+    if isinstance(history, HumanMessage):
+        st.chat_message("human").write(history.content)
 
+prompt = st.chat_input("Add your prompt..")
 
-# Defining a function to generate a response using the OpenAI language model
-def generate_response(input_text):
-    # Initializing the OpenAI language model with a specified temperature and API key
-    llm = OpenAI(temperature=0.7, openai_api_key=openai_api_key)
-    # Displaying the generated response as an informational message in the Streamlit app
-    st.info(llm(input_text))
+llm = ChatOllama(model="llama3.2:1b", temperature=0.7)
 
-# Creating a form in the Streamlit app for user input
-with st.form('my_form'):
-    # Adding a text area for user input
-    text = st.text_area('Enter text:', '')
-    # Adding a submit button for the form
-    submitted = st.form_submit_button('Submit')
-    # Displaying a warning if the entered API key does not start with 'sk-'
-    if not openai_api_key.startswith('sk-'):
-        st.warning('Please enter your OpenAI API key!', icon='⚠')
-    # If the form is submitted and the API key is valid, generate a response
-    if submitted and openai_api_key.startswith('sk-'):
-        generate_response(text)
+if prompt:
+    st.chat_message("user").write(prompt)
+    st.session_state["chat_history"] += [HumanMessage(prompt)]
+    output = llm.invoke(prompt)
+    
+    with st.chat_message("ai"):
+        ai_message = st.write_stream(output)
+    
+    st.session_state["chat_history"] += [AIMessage(ai_message)]
+
+## https://www.youtube.com/watch?v=k8I8nsml47g
