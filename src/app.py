@@ -18,12 +18,12 @@ for history in chat_history:
 
 prompt = st.chat_input("Add your prompt..")
 
-llm = ChatOllama(model="llama3.2:1b", temperature=0.7)
+llm = ChatOllama(model="llama2-uncensored", temperature=0.7)
 
 if prompt:
     st.chat_message("user").write(prompt)
     st.session_state["chat_history"] += [HumanMessage(prompt)]
-    output = llm.invoke(prompt)
+    output = llm.stream(prompt)
     
     with st.chat_message("ai"):
         ai_message = st.write_stream(output)
