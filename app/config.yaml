@@ -1,0 +1,4 @@
+appsettings:
+  ollama_host_url: http://localhost:11434 #http://ollama-container:11434
+  gcp_model_armor_template: MODEL_ARMOR_TEMPLATE_URI
+  gcp_model_armor_api_endpoint: MODEL_ARMOR_API_ENDPOINT

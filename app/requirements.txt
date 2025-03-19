@@ -1,0 +1,6 @@
+streamlit
+langchain-ollama
+ollama
+authlib
+google-cloud-modelarmor
+

@@ -1,0 +1,40 @@
+name: streamlit-ollama
+services:
+  ollama-container:
+    image: ollama/ollama:latest
+    networks:
+      - internal-net
+    volumes:
+      - ollama_models:/root/.ollama/models
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        limits:
+          memory: 10GiB
+    restart: unless-stopped
+  streamlit-app:
+    image: python:3.9-slim
+    networks:
+      - internal-net
+    ports:
+      - "8501:8501"
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - python-deps:/root/.cache/pip
+    command: bash -c "pip install --upgrade pip && pip install -r requirements.txt && streamlit run app.py"
+    restart: unless-stopped
+ 
+networks: 
+    internal-net:
+      driver: bridge
+
+volumes:
+  python-deps: {}
+  ollama_models: {}
+
+
+
+
+
