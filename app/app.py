@@ -1,4 +1,4 @@
-# Importing the necessary modules from the Streamlit and LangChain packages
+"""Importing the necessary modules from the Streamlit and LangChain packages"""
 
 import json
 import sys
@@ -29,11 +29,11 @@ ollama_client=ollama.Client(llm_host)
 def init():
     """Initializes streamlit UI"""
     package_data = {
-        "name": "LLM Chatbot Application using Streamlit and ChatOllama, including integrations with GCP's Model Armor.",
+        "name": "LLM Chatbot Application using Streamlit, ChatOllama, and GCP's Model Armor.",
         "version": "1.0.0-alpha.2",
     }
 
-    st.set_page_config( 
+    st.set_page_config(
         page_title=package_data["name"],
         page_icon="?",
         layout="wide"
@@ -43,14 +43,16 @@ def init():
 # Loads available models from JSON file
 def load_models():
     """Loads a list of LLM models that we want to use"""
-    with open("./data/models.json", mode="r", encoding="UTF-8") as file:
-        data = json.load(file)
+    with open("./data/models.json", mode="r", encoding="UTF-8") as models:
+        data = json.load(models)
     return data['models']
-# 
+
 def pull_model():
     """Pull selected model from Ollama and installs it locally"""
+    # pylint: disable=line-too-long
+    # pylint: disable=broad-exception-caught
     model_name = st.session_state['selected_model']
-    response = ollama_client.pull(model=model_name, stream=True) 
+    response = ollama_client.pull(model=model_name, stream=True)
     # Initialize a placeholder for progress update
     progress_bar = st.progress(0)
     progress_status = st.empty()
@@ -66,8 +68,8 @@ def pull_model():
                 if progress['status'] == 'success':
                     progress_status.success("Model pulled successfully!")
                     break
-                elif progress['status'] == 'error':
-                    progress_status.error("Error pulling the model: " + progress.get('message', 'No specific error message provided.'))
+                if progress['status'] == 'error':
+                    progress_status.error("Error pulling the model No specific error message provided.")
                     break
     except Exception as e:
         progress_status.error(f"Failed to pull model: {str(e)}")
@@ -92,6 +94,7 @@ def init_chat_history():
 
 def get_llm():
     """Initializes ChatOllama LLM"""
+    # pylint: disable=line-too-long
     model = st.session_state["selected_model"]
     llm = ChatOllama(model=model,base_url=llm_host, temperature=0.7)
     if not llm:
@@ -110,9 +113,10 @@ def get_model_armor_client():
         print("Failed to initialize Model Armor Client")
         sys.exit(1)
     return ml_armor_client
-    
+
 def sanitize_llm_responses_with_model_armor(llm_response):
     """Sanitizes the response from the LLM using ModelArmor's SanitizeModelResponseRequest"""
+    # pylint: disable=line-too-long
     client = get_model_armor_client()
     llm_resp_data = modelarmor_v1.DataItem()
     llm_resp_data.text = llm_response
@@ -122,8 +126,8 @@ def sanitize_llm_responses_with_model_armor(llm_response):
     )
     response = client.sanitize_model_response(request)
     res = parse_model_filter_results(response.sanitization_result.filter_results)
-   
-    resp = dict()
+
+    resp = {}
     resp['filter_match_state'] = response.sanitization_result.filter_match_state
     resp['error_code'] = response.sanitization_result.sanitization_metadata.error_code
     resp['error_msg'] = response.sanitization_result.sanitization_metadata.error_message
@@ -132,6 +136,7 @@ def sanitize_llm_responses_with_model_armor(llm_response):
     return resp
 
 def sanitized_user_prompts_with_model_armor(prompt):
+    # pylint: disable=line-too-long
     """Sanitizes the user prompt before submitting it to the LLM using ModelArmor's SanitizeUserPromptRequest"""
     client = get_model_armor_client()
     user_prompt_data = modelarmor_v1.DataItem()
@@ -142,9 +147,8 @@ def sanitized_user_prompts_with_model_armor(prompt):
     )
     response = client.sanitize_user_prompt(request)
     res = parse_model_filter_results(response.sanitization_result.filter_results)
-   
-    print(modelarmor_v1.SanitizationResult.to_json(response.sanitization_result))
-    resp = dict()
+
+    resp = {}
     resp['filter_match_state'] = response.sanitization_result.filter_match_state
     resp['error_code'] = response.sanitization_result.sanitization_metadata.error_code
     resp['error_msg'] = response.sanitization_result.sanitization_metadata.error_message
@@ -176,6 +180,7 @@ def sidebar_model_selection():
 
 def sidebar_model_armor_protection_options():
     """Configures the selection boxes to integrated Model Armor"""
+    # pylint: disable=line-too-long
     st.subheader("Model Armor Protections")
     st.checkbox("Sanitize User Prompts with Model Armor", False, key="ml_armor_user_prompt_protection")
     st.checkbox("Sanitize LLM Responses with Model Armor", False, key="ml_armor_llm_resp_protection")
@@ -192,27 +197,33 @@ def add_human_message(msg):
 
 def parse_model_filter_results(filtered_results: MutableMapping[str, modelarmor_v1.FilterResult]):
     """Parses the Model Armor Results to give more concrete results"""
+    # pylint: disable=line-too-long
+    # pylint: disable=too-many-statements
     #if not filtered_results:
+    result = ""
     for k in filtered_results:
         if filtered_results[k].csam_filter_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            return "Child Safety Abuse Material Detected"
-        elif filtered_results[k].malicious_uri_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            return "Malicious URI Detected"
-        elif filtered_results[k].virus_scan_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            return "Virus Detected"
-        elif filtered_results[k].sdp_filter_result.inspect_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            return "Sensitive Data Inspection Detected"
-        elif filtered_results[k].sdp_filter_result.deidentify_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            return "Sensitive Data DeIdentification Detected"
-        elif filtered_results[k].rai_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
+            result = "Child Safety Abuse Material Detected"
+        if filtered_results[k].malicious_uri_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
+            result = "Malicious URI Detected"
+        if filtered_results[k].virus_scan_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
+            result = "Virus Detected"
+        if filtered_results[k].sdp_filter_result.inspect_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
+            result = "Sensitive Data Inspection Detected"
+        if filtered_results[k].sdp_filter_result.deidentify_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
+            result = "Sensitive Data DeIdentification Detected"
+        if filtered_results[k].rai_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
             for i in filtered_results[k].rai_filter_result.rai_filter_type_results:
                 if filtered_results[k].rai_filter_result.rai_filter_type_results[i].match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-                    return "Responsible AI Detected - " + i
-        elif filtered_results[k].pi_and_jailbreak_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            return "Prompt injection and jailbreak detection"
+                    result = "Responsible AI Detected - " + i
+        if filtered_results[k].pi_and_jailbreak_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
+            result = "Prompt injection and jailbreak detection"
+    return result
 
 def run():
     """Start streamlit"""
+    # pylint: disable=line-too-long
+    # pylint: disable=too-many-statements
     init()
     with st.sidebar:
         st.header("Preferences")
@@ -229,7 +240,7 @@ def run():
 
     print("Protect user prompts with model armor:", ml_armor_user_prompt_protection)
     print("Protect llm responses with model armor:", ml_armor_llm_resp_protection)
-  
+
     llm = get_llm()
 
     if prompt:
@@ -247,7 +258,6 @@ def run():
                     # Pretty print with indentation
                     pretty_json = json.dumps(parsed_data, indent=4)
                     add_chat_message(output + " - " + filter_type + "\n\r" + pretty_json)
-    
                 else:
                     output = llm.stream(prompt)
                     with st.chat_message("ai"):
@@ -266,7 +276,8 @@ def run():
             if bool(resp):
                 if resp.get('filter_match_state','NO_KEY') == modelarmor_v1.FilterMatchState.MATCH_FOUND:
                     filter_type = resp.get('filter_result', '')
-                    output = resp.get('error_msg', 'Sorry I am unable to provide a response for this question due to the nature of the content.')
+                    output = resp.get('error_msg', 'Sorry I am unable to provide a response for \n' +
+                    ' this question due to the nature of the content.')
                     sanitization_result = resp.get('sanitization_result','')
                     # Convert to Python object
                     parsed_data = json.loads(sanitization_result)
@@ -275,7 +286,6 @@ def run():
                     add_chat_message(output + " - " + filter_type + "\n\r" + pretty_json)
                 else:
                     add_chat_message(output.content)
-                    
             else:
                 add_chat_message(output.content)
         else:
