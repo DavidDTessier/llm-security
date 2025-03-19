@@ -1,34 +1,33 @@
 # Importing the necessary modules from the Streamlit and LangChain packages
+
 import json
 import sys
-import ollama
-import yaml 
-
-
-
-import streamlit as st 
 from typing import MutableMapping
+
+import ollama
+import yaml
+
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_ollama import ChatOllama
 from google.cloud import modelarmor_v1
-from  google.oauth2 import service_account
+from google.oauth2 import service_account
 
+import streamlit as st
 
 from yaml.loader import SafeLoader
-with open('config.yaml') as file:
+with open('config.yaml', mode="r", encoding="utf-8") as file:
     app_config = yaml.load(file, Loader=SafeLoader)
 
-creds = credentials = service_account.Credentials.from_service_account_file('creds.json')
+creds = credentials = service_account.Credentials.from_service_account_file("creds.json")
 llm_host=app_config["appsettings"]["ollama_host_url"]
 gcp_model_armor_api_url=app_config["appsettings"]["gcp_model_armor_api_endpoint"]
 gcp_model_armor_template=app_config["appsettings"]["gcp_model_armor_template"]
 
 
-
-
 ollama_client=ollama.Client(llm_host)
 
 def init():
+    """Initializes streamlit UI"""
     package_data = {
         "name": "LLM Chatbot Application using Streamlit and ChatOllama, including integrations with GCP's Model Armor.",
         "version": "1.0.0-alpha.2",
@@ -43,18 +42,18 @@ def init():
 
 # Loads available models from JSON file
 def load_models():
-    with open('./data/models.json', 'r') as file:
+    """Loads a list of LLM models that we want to use"""
+    with open("./data/models.json", mode="r", encoding="UTF-8") as file:
         data = json.load(file)
     return data['models']
-
+# 
 def pull_model():
+    """Pull selected model from Ollama and installs it locally"""
     model_name = st.session_state['selected_model']
-    response = ollama_client.pull(model=model_name, stream=True)
-    
+    response = ollama_client.pull(model=model_name, stream=True) 
     # Initialize a placeholder for progress update
     progress_bar = st.progress(0)
     progress_status = st.empty()
-    
     try:
         for progress in response:
             if 'completed' in progress and 'total' in progress:
@@ -74,12 +73,13 @@ def pull_model():
         progress_status.error(f"Failed to pull model: {str(e)}")
 
 def init_chat_history():
+    """Initializes chat history"""
     if "chat_history" not in st.session_state:
         st.session_state["chat_history"] = [AIMessage("Hello, how can I help you?")]
 
     if "selected_model" not in st.session_state:
-        st.session_state["selected_model"]: get_models()[0]
-    
+        st.session_state["selected_model"]: load_models()[0]
+
     if "model_armor_protection" not in st.session_state:
         st.session_state["model_armor_protection"]: False
 
@@ -91,6 +91,7 @@ def init_chat_history():
             st.chat_message("human").write(history.content)
 
 def get_llm():
+    """Initializes ChatOllama LLM"""
     model = st.session_state["selected_model"]
     llm = ChatOllama(model=model,base_url=llm_host, temperature=0.7)
     if not llm:
@@ -99,9 +100,10 @@ def get_llm():
     # otherwise return the initialized llm
     return llm
 
-def getModelArmorClient():
+def get_model_armor_client():
+    """Initializes ModelArmor Client"""
     ml_armor_client = modelarmor_v1.ModelArmorClient(
-        transport="rest", 
+        transport="rest",
         client_options = {"api_endpoint" : gcp_model_armor_api_url},
         credentials=creds)
     if not ml_armor_client:
@@ -110,7 +112,8 @@ def getModelArmorClient():
     return ml_armor_client
     
 def sanitize_llm_responses_with_model_armor(llm_response):
-    client = getModelArmorClient()
+    """Sanitizes the response from the LLM using ModelArmor's SanitizeModelResponseRequest"""
+    client = get_model_armor_client()
     llm_resp_data = modelarmor_v1.DataItem()
     llm_resp_data.text = llm_response
     request = modelarmor_v1.SanitizeModelResponseRequest(
@@ -118,10 +121,8 @@ def sanitize_llm_responses_with_model_armor(llm_response):
         model_response_data=llm_resp_data
     )
     response = client.sanitize_model_response(request)
-    res = parseModelArmorFilterResult(response.sanitization_result.filter_results)
-    print(response.sanitization_result)
-    print(response.sanitization_result.sanitization_metadata.error_code)
-    print(response.sanitization_result.sanitization_metadata.error_message)
+    res = parse_model_filter_results(response.sanitization_result.filter_results)
+   
     resp = dict()
     resp['filter_match_state'] = response.sanitization_result.filter_match_state
     resp['error_code'] = response.sanitization_result.sanitization_metadata.error_code
@@ -130,8 +131,9 @@ def sanitize_llm_responses_with_model_armor(llm_response):
     resp['sanitization_result'] = modelarmor_v1.SanitizationResult.to_json(response.sanitization_result)
     return resp
 
-def validate_user_prompts_with_model_armor(prompt):
-    client = getModelArmorClient()
+def sanitized_user_prompts_with_model_armor(prompt):
+    """Sanitizes the user prompt before submitting it to the LLM using ModelArmor's SanitizeUserPromptRequest"""
+    client = get_model_armor_client()
     user_prompt_data = modelarmor_v1.DataItem()
     user_prompt_data.text = prompt
     request = modelarmor_v1.SanitizeUserPromptRequest(
@@ -139,13 +141,8 @@ def validate_user_prompts_with_model_armor(prompt):
         user_prompt_data=user_prompt_data
     )
     response = client.sanitize_user_prompt(request)
-    res = parseModelArmorFilterResult(response.sanitization_result.filter_results)
-    #print(res)
-    #print(response.sanitization_result.filter_match_state.value)
-    #print(response.sanitization_result)
-    #print(response.sanitization_result.sanitization_metadata.error_code)
-    #print(response.sanitization_result.sanitization_metadata.error_message)
-
+    res = parse_model_filter_results(response.sanitization_result.filter_results)
+   
     print(modelarmor_v1.SanitizationResult.to_json(response.sanitization_result))
     resp = dict()
     resp['filter_match_state'] = response.sanitization_result.filter_match_state
@@ -157,6 +154,7 @@ def validate_user_prompts_with_model_armor(prompt):
 
 # Model selection module to be used within the Streamlit App layout.
 def sidebar_model_selection():
+    """Configures Model Selection Dropdown for Streamlit sidebar"""
     st.subheader("Model")
 
     models = load_models()
@@ -169,30 +167,31 @@ def sidebar_model_selection():
 
     if model_identifier:
         st.session_state['selected_model'] = model_identifier
-        
         st.write(model_options[model_identifier][1])
 
-        col1, col2 = st.columns(2, gap="small")
-        #with col1:
-            #if st.button("Update list", use_container_width=True):
-              #update_model_list()
+        col2 = st.columns(2, gap="small")
         with col2:
             if st.button("Pull model", use_container_width=True):
                 pull_model()
+
 def sidebar_model_armor_protection_options():
+    """Configures the selection boxes to integrated Model Armor"""
     st.subheader("Model Armor Protections")
     st.checkbox("Sanitize User Prompts with Model Armor", False, key="ml_armor_user_prompt_protection")
     st.checkbox("Sanitize LLM Responses with Model Armor", False, key="ml_armor_llm_resp_protection")
 
-def addChatBotMessage(msg):
+def add_chat_message(msg):
+    """Add Chat Bot Message to History"""
     st.chat_message("ai").write(msg)
     st.session_state["chat_history"] += [AIMessage(msg)]
 
-def addHumanMessage(msg):
+def add_human_message(msg):
+    """Add Human Message to History"""
     st.chat_message("user").write(msg)
     st.session_state["chat_history"] += [HumanMessage(msg)]
 
-def parseModelArmorFilterResult(filtered_results: MutableMapping[str, modelarmor_v1.FilterResult]):
+def parse_model_filter_results(filtered_results: MutableMapping[str, modelarmor_v1.FilterResult]):
+    """Parses the Model Armor Results to give more concrete results"""
     #if not filtered_results:
     for k in filtered_results:
         if filtered_results[k].csam_filter_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
@@ -213,16 +212,15 @@ def parseModelArmorFilterResult(filtered_results: MutableMapping[str, modelarmor
             return "Prompt injection and jailbreak detection"
 
 def run():
+    """Start streamlit"""
     init()
     with st.sidebar:
         st.header("Preferences")
         sidebar_model_selection()
         sidebar_model_armor_protection_options()
-        
-    
+
     init_chat_history()
     prompt = st.chat_input("Add your prompt..")
-    
     selected_model = st.session_state["selected_model"]
     print("Selected model: ", selected_model)
 
@@ -231,14 +229,14 @@ def run():
 
     print("Protect user prompts with model armor:", ml_armor_user_prompt_protection)
     print("Protect llm responses with model armor:", ml_armor_llm_resp_protection)
-    
+  
     llm = get_llm()
 
     if prompt:
         st.chat_message("user").write(prompt)
-        st.session_state["chat_history"] += [HumanMessage(prompt)]
+        add_human_message(prompt)
         if ml_armor_user_prompt_protection is True:
-            resp = validate_user_prompts_with_model_armor(prompt)
+            resp = sanitized_user_prompts_with_model_armor(prompt)
             if bool(resp):
                 if resp.get('filter_match_state','NO_KEY') == modelarmor_v1.FilterMatchState.MATCH_FOUND:
                     filter_type = resp.get('filter_result', '')
@@ -248,7 +246,7 @@ def run():
                     parsed_data = json.loads(sanitization_result)
                     # Pretty print with indentation
                     pretty_json = json.dumps(parsed_data, indent=4)
-                    addChatBotMessage(output + " - " + filter_type + "\n\r" + pretty_json)
+                    add_chat_message(output + " - " + filter_type + "\n\r" + pretty_json)
     
                 else:
                     output = llm.stream(prompt)
@@ -256,10 +254,10 @@ def run():
                         ai_message = st.write_stream(output)
                     st.session_state["chat_history"] += [AIMessage(ai_message)]
             else:
-                    output = llm.stream(prompt)
-                    with st.chat_message("ai"):
-                        ai_message = st.write_stream(output)
-                    st.session_state["chat_history"] += [AIMessage(ai_message)]
+                output = llm.stream(prompt)
+                with st.chat_message("ai"):
+                    ai_message = st.write_stream(output)
+                st.session_state["chat_history"] += [AIMessage(ai_message)]
 
         elif ml_armor_llm_resp_protection is True:
             output = llm.invoke(prompt)
@@ -274,17 +272,17 @@ def run():
                     parsed_data = json.loads(sanitization_result)
                     # Pretty print with indentation
                     pretty_json = json.dumps(parsed_data, indent=4)
-                    addChatBotMessage(output + " - " + filter_type + "\n\r" + pretty_json)
+                    add_chat_message(output + " - " + filter_type + "\n\r" + pretty_json)
                 else:
-                    addChatBotMessage(output.content)
+                    add_chat_message(output.content)
                     
             else:
-                    addChatBotMessage(output.content)
+                add_chat_message(output.content)
         else:
-                output = llm.stream(prompt)
-                with st.chat_message("ai"):
-                    ai_message = st.write_stream(output)
-                st.session_state["chat_history"] += [AIMessage(ai_message)]
+            output = llm.stream(prompt)
+            with st.chat_message("ai"):
+                ai_message = st.write_stream(output)
+            st.session_state["chat_history"] += [AIMessage(ai_message)]
 
 if __name__ == "__main__":
     run()
