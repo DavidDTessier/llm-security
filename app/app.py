@@ -172,11 +172,8 @@ def sidebar_model_selection():
     if model_identifier:
         st.session_state['selected_model'] = model_identifier
         st.write(model_options[model_identifier][1])
-
-        col2 = st.columns(2, gap="small")
-        with col2:
-            if st.button("Pull model", use_container_width=True):
-                pull_model()
+        if st.button("Pull model", use_container_width=True):
+            pull_model()
 
 def sidebar_model_armor_protection_options():
     """Configures the selection boxes to integrated Model Armor"""
