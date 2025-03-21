@@ -82,7 +82,7 @@ Run the command `podman compose --file docker-compose.yaml up` to setup the cont
 Once you have with of the options up and running navigate to `http://localhost:8501` to start using the app.
 
 ### Live Demo
-https://github.com/user-attachments/assets/6b6e1306-b5ff-418e-835b-2a7f4ef418a6
+https://github.com/user-attachments/assets/ed0b911a-4afb-4964-a323-c4d292cd3023
 
 
 
