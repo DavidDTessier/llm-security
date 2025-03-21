@@ -81,9 +81,8 @@ Run the command `podman compose --file docker-compose.yaml up` to setup the cont
 
 Once you have with of the options up and running navigate to `http://localhost:8501` to start using the app.
 
-<figure class="video_container">
-  <iframe src="content/LiveDemo.m4v" frameborder="0" allowfullscreen="true"> 
-</iframe>
-</figure>
+### Live Demo
+https://github.com/user-attachments/assets/6b6e1306-b5ff-418e-835b-2a7f4ef418a6
+
 
 
