@@ -146,6 +146,7 @@ def sanitized_user_prompts_with_model_armor(prompt):
         user_prompt_data=user_prompt_data
     )
     response = client.sanitize_user_prompt(request)
+    print(response.sanitization_result)
     res = parse_model_filter_results(response.sanitization_result.filter_results)
 
     resp = {}
@@ -197,24 +198,24 @@ def parse_model_filter_results(filtered_results: MutableMapping[str, modelarmor_
     # pylint: disable=line-too-long
     # pylint: disable=too-many-statements
     #if not filtered_results:
-    result = ""
+    result = " "
     for k in filtered_results:
         if filtered_results[k].csam_filter_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            result = "Child Safety Abuse Material Detected"
+            result += "Child Safety Abuse Material Detected "
         if filtered_results[k].malicious_uri_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            result = "Malicious URI Detected"
+            result += "Malicious URI Detected "
         if filtered_results[k].virus_scan_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            result = "Virus Detected"
+            result += "Virus Detected "
         if filtered_results[k].sdp_filter_result.inspect_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            result = "Sensitive Data Inspection Detected"
+            result += "Sensitive Data Inspection Detected "
         if filtered_results[k].sdp_filter_result.deidentify_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            result = "Sensitive Data DeIdentification Detected"
+            result += "Sensitive Data DeIdentification Detected "
         if filtered_results[k].rai_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
             for i in filtered_results[k].rai_filter_result.rai_filter_type_results:
                 if filtered_results[k].rai_filter_result.rai_filter_type_results[i].match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-                    result = "Responsible AI Detected - " + i
+                    result = "Responsible AI Detected - " + i + " "
         if filtered_results[k].pi_and_jailbreak_filter_result.match_state == modelarmor_v1.FilterMatchState.MATCH_FOUND:
-            result = "Prompt injection and jailbreak detection"
+            result = "Prompt injection and jailbreak detection "
     return result
 
 def run():
@@ -241,7 +242,6 @@ def run():
     llm = get_llm()
 
     if prompt:
-        st.chat_message("user").write(prompt)
         add_human_message(prompt)
         if ml_armor_user_prompt_protection is True:
             resp = sanitized_user_prompts_with_model_armor(prompt)
